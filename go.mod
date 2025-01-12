@@ -1,4 +1,4 @@
-module github.com/bdwyertech/proxyplease
+module github.com/novax/proxyplease
 
 go 1.12
 
