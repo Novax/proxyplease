@@ -18,6 +18,7 @@ type Proxy struct {
 	Username         string       // Username for authentication. This value is overridden if user is supplied in ProxyURL.
 	Password         string       // Password for authentication. This value is overridden if pass is supplied in Proxy.URL.
 	Domain           string       // Windows Domain. Used only for NTLM authentication.
+	Keytab           string       // Path to keytab
 	TargetURL        *url.URL     // Target URL for proxy. Used to look up proxy from a PAC provided by the environment.
 	Headers          *http.Header // Add additional headers to the HTTP CONNECT request
 	TLSConfig        *tls.Config  // Provide your own TLSConfig
