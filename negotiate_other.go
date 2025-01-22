@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"github.com/jcmturner/gokrb5/v8/client"
 	"github.com/jcmturner/gokrb5/v8/config"
+	"github.com/jcmturner/gokrb5/v8/credentials"
 	"github.com/jcmturner/gokrb5/v8/keytab"
 	"github.com/jcmturner/gokrb5/v8/spnego"
 	"net"
 	"net/http"
 	"net/url"
+	"os/user"
 )
 
 func dialNegotiate(p Proxy, addr string, baseDial func() (net.Conn, error)) (net.Conn, error) {
@@ -29,18 +31,11 @@ func dialNegotiate(p Proxy, addr string, baseDial func() (net.Conn, error)) (net
 	h := p.URL.Hostname()
 	spn := "HTTP/" + h
 
-	cfg, err := config.Load("/etc/krb5.conf")
+	cl, err := getKrbClient(p)
 	if err != nil {
-		debugf("negotiate> Error loading krb5.conf: %s", err)
+		debugf("negotiate> could not create krb client: %v", err)
 		return conn, err
 	}
-
-	kt, err := keytab.Load(p.Keytab)
-	if err != nil {
-		debugf("negotiate> Error loading keytab: %s", err)
-		return conn, err
-	}
-	cl := client.NewWithKeytab(p.Username, p.Domain, kt, cfg)
 
 	spnegoCl := spnego.SPNEGOClient(cl, spn)
 
@@ -93,4 +88,33 @@ func dialNegotiate(p Proxy, addr string, baseDial func() (net.Conn, error)) (net
 
 	debugf("negotiate> Successfully injected Negotiate::Kerberos to connection")
 	return conn, nil
+}
+
+func getKrbClient(p Proxy) (*client.Client, error) {
+	cfg, err := config.Load("/etc/krb5.conf")
+	if err != nil {
+		debugf("negotiate> Error loading krb5.conf: %s", err)
+		return nil, err
+	}
+
+	if p.Keytab == "" {
+		usr, _ := user.Current()
+		cpath := "/tmp/krb5cc_" + usr.Uid
+		ccache, err := credentials.LoadCCache(cpath)
+
+		if err != nil {
+			debugf("negotiate> Error loading credentials from cache %s: %v", cpath, err)
+			return nil, err
+		}
+
+		return client.NewFromCCache(ccache, cfg)
+	}
+
+	kt, err := keytab.Load(p.Keytab)
+	if err != nil {
+		debugf("negotiate> Error loading keytab: %s", err)
+		return nil, err
+	}
+
+	return client.NewWithKeytab(p.Username, p.Domain, kt, cfg), nil
 }
